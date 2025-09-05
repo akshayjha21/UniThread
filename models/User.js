@@ -64,4 +64,4 @@ const userSchema = new Schema({
 { timestamps: true } // ✅ Correct placement - outside schema fields
 );
 
-module.exports = mongoose.model("User", userSchema);
+export default mongoose.model("User",userSchema)

@@ -1,17 +1,69 @@
 import mongoose from "mongoose";
+import PostLike from "./PostLikes.js";
+import { filter } from "../utils/Filter.js";
 
-const PostLike=new mongoose.Schema({
-    postId:{
-        type:mongoose.Types.ObjectId,
-        ref:"post",
-        required:true,
+const PostSchema = new mongoose.Schema(
+  {
+    poster: {
+      type: mongoose.Types.ObjectId,
+      ref: "User",
+      required: true,
     },
-    userId:{
-        type:mongoose.Types.ObjectId,
-        ref:"user",
-        required:true,
+    title: {
+      type: String,
+      required: true,
+      maxLength: [80, "Must be no more than 80 characters"],
     },
-},
-{timestamps:true});
+    content: {
+      type: String,
+      required: true,
+      maxLength: [8000, "Must be no more than 8000 characters"],
+    },
+    images: [
+      {
+        url: String,
+        publicId: String, // For Cloudinary deletion
+        alt: String,
+      },
+    ],
+    videos: [
+      {
+        url: String,
+        publicId: String,
+        thumbnail: String,
+      },
+    ],
+    likeCount: {
+      type: Number,
+      default: 0,
+    },
+    commentCount: {
+      type: Number,
+      default: 0,
+    },
+    edited: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  { timestamps: true },
+);
 
-module.exports = mongoose.model("PostLike",PostLike);
+PostSchema.pre("save", function (next) {
+  if (this.title.length > 0) {
+    this.title = filter.clean(this.title);
+  }
+
+  if (this.content.length > 0) {
+    this.content = filter.clean(this.content);
+  }
+
+  next();
+});
+PostSchema.pre("remove", async function (next) {
+  console.log(this._id);
+  await PostLike.deleteMany({ postId: this._id });
+  next();
+});
+
+export default mongoose.model("Post", PostSchema);
