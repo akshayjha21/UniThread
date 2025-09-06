@@ -5,10 +5,10 @@ dotenv.config({
 })
 
 //importing routes
-import {Posts} from './routes/Posts'
-import {Comments} from './routes/Comments'
-import {Users} from './routes/Users'
-import {Messages} from './routes/Messages'
+import {Posts} from './routes/Posts.routes'
+import {Comments} from './routes/Comments.routes'
+import {Users} from './routes/Users.routes'
+import {Messages} from './routes/Messages.routes'
 
 import express from 'express'
 import cors from 'cors'

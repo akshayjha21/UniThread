@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import PostLike from "./PostLikes.js";
+import PostLike from "./PostLikes.models.js";
 import { filter } from "../utils/Filter.js";
 
 const PostSchema = new mongoose.Schema(
