@@ -3,12 +3,12 @@ const MessageSchema = new mongoose.Schema(
   {
     conversation: {
       type: mongoose.Types.ObjectId,
-      ref: "conversation",
+      ref: "Conversation",
       required: true,
     },
     sender: {
       type: mongoose.Types.ObjectId,
-      ref: "user",
+      ref: "User",
       required: true,
     },
     content: {
