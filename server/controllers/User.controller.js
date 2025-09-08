@@ -17,6 +17,30 @@ dotenv.config({
     path:'./.env'
 })
 
+//we will always deal with the mongodb operation using async and await
+
+//generating access token and refresh token 
+const generateacessandrefreshtoken =async(userid)=>{
+    try {
+        const user= await User.findById(userid);
+    
+        if(!user){
+            throw new error(404,"User not found")
+        }
+        //generating the acess and refresh token
+        const accessToken=user.generateacesstoken();
+        const refreshToken=user.generaterefreshtoken();
+    
+        //we will save the refreshtoken in the db
+        user.refreshToken=refreshToken;
+    
+        await user.save({validateBeforeSave:false});
+        return{refreshToken,accessToken}
+    } catch (error) {
+        console.log("Error generating RefreshToken and AcessToken",error)
+        throw new error(500,"Error generating RefreshToken and AcessToken")
+    }
+}
 
 
 
