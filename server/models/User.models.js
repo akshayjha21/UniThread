@@ -105,6 +105,8 @@ userSchema.pre("save", async function (next) {
     if (this.fullname && filter.isProfane(this.fullname)) {
       this.fullname = filter.clean(this.fullname);
     }
+    if (!this.isModified("password")) { return next(); }
+    this.password = bcrypt.hash(this.password, 10);
     next();
   } catch (error) {
     next(error);
@@ -127,6 +129,11 @@ userSchema.methods.generateAccessToken = function () {
     }
   );
 };
+
+//validating password 
+userSchema.methods.isPasswordCorrect = async function(password){
+    return await bcrypt.compare(password, this.password)
+}
 
 
 userSchema.methods.generateRefreshToken = function () {
