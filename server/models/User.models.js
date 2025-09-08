@@ -41,39 +41,39 @@ const userSchema = new Schema({
     default: "",
     maxlength: [250, "Must be no more than 250 characters long"]
   },
-  profilePicture: { 
+  avatar: { 
     type: String,
     default: ""
   },
-  collegeDomain: { 
-    type: String, 
-    required: true,
-    lowercase: true
-  },
-  year: { 
-    type: String, 
-    required: true,
-    enum: ["1st", "2nd", "3rd", "4th", "Graduate"]
-  },
-  course: { 
-    type: String,
-    required: true,
-    trim: true
-  },
+  // collegeDomain: { 
+  //   type: String, 
+  //   required: true,
+  //   lowercase: true
+  // },
+  // year: { 
+  //   type: String, 
+  //   required: true,
+  //   enum: ["1st", "2nd", "3rd", "4th", "Graduate"]
+  // },
+  // course: { 
+  //   type: String,
+  //   required: true,
+  //   trim: true
+  // },
 
   // Verification fields
-  isVerified: { 
-    type: Boolean, 
-    required: true,
-    default: false
-  },
+  // isVerified: { 
+  //   type: Boolean, 
+  //   required: true,
+  //   default: false
+  // },
   verificationToken: { 
     type: String 
   },
-  emailVerifiedAt: { 
-    type: Date,
-    default: null
-  },
+  // emailVerifiedAt: { 
+  //   type: Date,
+  //   default: null
+  // },
   refreshToken: { type: String },
   isActive: { 
     type: Boolean,
@@ -81,10 +81,10 @@ const userSchema = new Schema({
   },
   
   // ✅ Added from reference code
-  isAdmin: {
-    type: Boolean,
-    default: false
-  }
+  // isAdmin: {
+  //   type: Boolean,
+  //   default: false
+  // }
 }, 
 { timestamps: true });
 
