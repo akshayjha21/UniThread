@@ -19,14 +19,14 @@ const PostSchema = new mongoose.Schema(
       required: true,
       maxLength: [8000, "Must be no more than 8000 characters"],
     },
-    images: [
+    image: [
       {
         url: String,
         publicId: String, // For Cloudinary deletion
         alt: String,
       },
     ],
-    videos: [
+    video: [
       {
         url: String,
         publicId: String,

@@ -6,14 +6,11 @@ import { uploadcloudinary } from "../utils/Cloudinary.js";
 //importing models
 import User from "../models/User.models.js";
 import Post from "../models/Post.models.js";
-import PostLike from "../models/PostLikes.models.js";
 import Follow from "../models/Follow.models.js";
 
-import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-
 dotenv.config({
   path: "./.env",
 });
@@ -56,7 +53,6 @@ const registerUser = asynchandler(async (req, res) => {
   if (existeduser) {
     throw new apierror(409, "User already exists");
   }
-
   const user = await User.create({
     fullname,
     username: username.toLowerCase(),
@@ -261,9 +257,8 @@ const unfollowUser = asynchandler(async(req,res) => {
 //getting followers
 const getFollowers = asynchandler(async(req,res) => {
     try {
-        const userId = req.params.id;
-        
-        const followers = await Follow.find({followingId: userId})
+       const userId=req.param.id
+       const followers=await Follow.find({followingId:userId})
         return res.status(200).json(new apiresponse(200, {followersList: followers}))
     } catch (error) {
         throw new apierror(404, "Something went wrong while fetching the followers list")
@@ -361,7 +356,7 @@ const getRandomUsers = asynchandler(async (req, res) => {
 });
 
 //updateAvatar
-const updateUserAvatar = asyncHandler(async(req, res) => {
+const updateUserAvatar = asynchandler(async(req, res) => {
     const avatarLocalPath = req.file?.path
 
     if (!avatarLocalPath) {
@@ -392,7 +387,61 @@ const updateUserAvatar = asyncHandler(async(req, res) => {
     )
 })
 
+const updateUser = asynchandler(async (req, res) => {
+  try {
+    const { userId, biography } = req.body;
 
+    // Validate userId format
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: "Invalid user ID format" });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: "User does not exist" });
+    }
+
+    // Validate biography if provided
+    if (biography !== undefined) {
+      if (typeof biography !== "string") {
+        return res.status(400).json({ error: "Biography must be a string" });
+      }
+      
+      if (biography.length > 250) {
+        return res.status(400).json({ error: "Biography must be no more than 250 characters" });
+      }
+
+      // Check for profanity before saving
+      if (filter.isProfane(biography)) {
+        return res.status(400).json({ error: "Biography contains inappropriate content" });
+      }
+
+      user.bio = biography; // Use 'bio' to match your schema
+    }
+
+    await user.save();
+
+    // Return updated user data (excluding sensitive info)
+    const updatedUser = {
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      fullname: user.fullname,
+      bio: user.bio,
+      avatar: user.avatar
+    };
+
+    return res.status(200).json({ 
+      success: true, 
+      message: "User updated successfully",
+      user: updatedUser 
+    });
+  } catch (err) {
+    console.error("Update user error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
 export { 
     registerUser, 
     logingUser,
@@ -405,5 +454,6 @@ export {
     getFollowing,
     getUser,
     getRandomUsers,
-    updateUserAvatar
+    updateUserAvatar,
+    updateUser
 };

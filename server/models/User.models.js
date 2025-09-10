@@ -1,8 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import  isEmail from "validator";
-import  contains from "validator";
+import { isEmail, contains } from "validator";
 import {filter} from "../utils/Filter.js"; // Assuming you have this profanity filter
 
 const userSchema = new Schema({ 
