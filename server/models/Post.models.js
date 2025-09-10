@@ -66,4 +66,6 @@ PostSchema.pre("remove", async function (next) {
   next();
 });
 
+
+
 export default mongoose.model("Post", PostSchema);
