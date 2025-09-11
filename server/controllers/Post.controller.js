@@ -8,60 +8,67 @@ import { apierror } from "../utils/apierror.js";
 import { apiresponse } from "../utils/apiresponse.js";
 
 import mongoose from "mongoose";
-import {filter} from "../utils/Filter.js"
+import { filter } from "../utils/Filter.js";
 import { paginate } from "../utils/Paginate.js";
 import { uploadcloudinary } from "../utils/Cloudinary.js";
 
-const cooldown=new set();
+// Fix: Set not set
+const cooldown = new Set();
+const USER_LIKES_PAGE_SIZE = 20; // Define missing constant
 
+// Creating a post
+const createPost = asynchandler(async (req, res) => {
+  try {
+    const { title, content } = req.body;
+    const userId = req.user._id; // Fix: Get from auth middleware, not req.body
 
-//creating a post
-//rember we have to upload the image too
-
-const createPost=asynchandler(async(req,res)=>{
-    try {
-        const {title,content,userId}=req.body;
-    
-        if(!title && !content){
-            throw new apierror(410,"Required fieilds are needed")
-        }
-        content= filter.clean(content)
-        if(cooldown.has(userId)){
-            throw new apierror(404,"User is posting the content too frequently")
-        }
-        cooldown.add(userId);
-        setTimeout(()=>{
-            cooldown.delete(userId)
-        },60000)
-    
-          const post = await Post.create({
-          title,
-          content,
-          poster: userId,
-        });
-        return res.status(200).json(new apiresponse(200,{Post:post}))
-    } catch (error) {
-        throw new apierror(404,"Something went wrong while creating the Post")
+    // Fix: Use OR (||) not AND (&&)
+    if (!title || !content) {
+      throw new apierror(400, "Title and content are required"); // Fix: 400 not 410
     }
-})
+
+    // Fix: Can't reassign const, create new variable
+    const cleanedContent = filter.clean(content);
+
+    if (cooldown.has(userId.toString())) {
+      throw new apierror(429, "Please wait before creating another post"); // Fix: 429 not 404
+    }
+
+    cooldown.add(userId.toString());
+    setTimeout(() => {
+      cooldown.delete(userId.toString());
+    }, 60000);
+
+    const post = await Post.create({
+      title,
+      content: cleanedContent,
+      poster: userId,
+    });
+
+    return res.status(201).json(new apiresponse(201, { post }, "Post created successfully")); // Fix: 201 for creation
+  } catch (error) {
+    // Fix: Preserve original error if it's an apierror
+    if (error instanceof apierror) throw error;
+    throw new apierror(500, `Failed to create post: ${error.message}`);
+  }
+});
+
 const createPostwithImg = asynchandler(async (req, res) => {
   try {
-    // Fix: req.file not req.filed
     const imgpostpath = req.file?.path;
     
     if (!imgpostpath) {
-      throw new apierror(400, "Post image is required"); 
+      throw new apierror(400, "Post image is required");
     }
 
     // Upload to Cloudinary
     const uploadimg = await uploadcloudinary(imgpostpath);
 
     if (!uploadimg?.url) {
-      throw new apierror(500, "Failed to upload image to Cloudinary"); 
+      throw new apierror(500, "Failed to upload image to Cloudinary");
     }
 
-    // Fix: Get postId from params or body, not req.Post
-    const { postId } = req.params; // or req.body.postId
+    const { postId } = req.params;
     
     if (!postId) {
       throw new apierror(400, "Post ID is required");
@@ -75,7 +82,7 @@ const createPostwithImg = asynchandler(async (req, res) => {
           image: uploadimg.url
         }
       },
-      { new: true, runValidators: true } 
+      { new: true, runValidators: true }
     );
 
     if (!post) {
@@ -86,233 +93,246 @@ const createPostwithImg = asynchandler(async (req, res) => {
       new apiresponse(200, { post }, "Image uploaded successfully")
     );
   } catch (error) {
+    if (error instanceof apierror) throw error;
     throw new apierror(500, `Failed to upload image: ${error.message}`);
   }
 });
 
-const getPost=asynchandler(async(req,res)=>{
-    try {
-        const Postid=req.params.id
-        const {userId}=req.body
-    
-        if(!mongoose.Types.ObjectId.isValid(Postid)){
-            throw new apierror(400,"Poster does not exist")
-        }
-        const post = await Post.findById(Postid)
-          .populate("poster", "-password")
-          .lean();
-    
-         if (!post) {
-          throw new apierror(400,"Post does not exist");
-        }
-        if(!userId){
-            throw new apierror(400,"Post does not found")
-        }
-         if (userId) {
-          await setLiked([post], userId);
-        }
-        await enrichWithUserLikePreview([post]);
-        return res.status(200).json({Posts:post})
-    } catch (error) {
-        throw new apierror(500,"Something went wrong while fetching the post")
+const getPost = asynchandler(async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const userId = req.user?._id; // Fix: Optional chaining for optional auth
+
+    if (!mongoose.Types.ObjectId.isValid(postId)) {
+      throw new apierror(400, "Invalid post ID");
     }
-})
+
+    const post = await Post.findById(postId)
+      .populate("poster", "-password")
+      .lean();
+
+    if (!post) {
+      throw new apierror(404, "Post not found");
+    }
+
+    // Fix: Make userId optional - not all users need to be authenticated to view posts
+    if (userId) {
+      await setLiked([post], userId.toString());
+    }
+
+    await enrichWithUserLikePreview([post]);
+    return res.status(200).json(new apiresponse(200, { post }, "Post retrieved successfully"));
+  } catch (error) {
+    if (error instanceof apierror) throw error;
+    throw new apierror(500, `Failed to fetch post: ${error.message}`);
+  }
+});
+
 const getPosts = asynchandler(async (req, res) => {
   try {
-    const { userId } = req.body;
-
-    let { page, sortBy, author, search, liked } = req.query;
+    const userId = req.user?._id; // Fix: Optional auth
+    let { page, sortBy, author, search } = req.query;
 
     if (!sortBy) sortBy = "-createdAt";
     if (!page) page = 1;
 
-    let posts = await Post.find()
+    // Fix: Build database query instead of filtering after fetching
+    let query = {};
+    
+    if (author) {
+      const authorUser = await User.findOne({ username: author });
+      if (authorUser) {
+        query.poster = authorUser._id;
+      } else {
+        // Return empty result if author doesn't exist
+        return res.status(200).json(new apiresponse(200, { data: [], count: 0 }));
+      }
+    }
+
+    if (search) {
+      query.title = { $regex: search, $options: 'i' };
+    }
+
+    let posts = await Post.find(query)
       .populate("poster", "-password")
       .sort(sortBy)
       .lean();
 
-    if (author) {
-      posts = posts.filter((post) => post.poster.username == author);
-    }
-
-    if (search) {
-      posts = posts.filter((post) =>
-        post.title.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-
     const count = posts.length;
-
     posts = paginate(posts, 10, page);
 
     if (userId) {
-      await setLiked(posts, userId);
+      await setLiked(posts, userId.toString());
     }
 
     await enrichWithUserLikePreview(posts);
 
-    return res.status(200).json(new apiresponse(200,{ data: posts, count }));
-  } catch (err) {
-    console.log(err.message);
-    throw new apierror(500,"Something went wrong while fetching Posts");
+    return res.status(200).json(new apiresponse(200, { data: posts, count }));
+  } catch (error) {
+    console.error('Error fetching posts:', error);
+    throw new apierror(500, `Failed to fetch posts: ${error.message}`);
   }
 });
 
-/*
-The setLiked function is likely a utility function that:
-What it does:
-        ?Gets all likes by a specific user from the PostLike collection
-        ?Loops through posts and checks if the user liked each one
-        ?Adds liked: true property to posts that the user has liked
-*/
 const setLiked = async (posts, userId) => {
   let searchCondition = {};
   if (userId) searchCondition = { userId };
   
-  // Get all likes made by this specific user
   const userPostLikes = await PostLike.find(searchCondition);
   
-  // Loop through each post
   posts.forEach((post) => {
-    // For each post, check if the user has liked it
+    post.liked = false; // Fix: Initialize as false
     userPostLikes.forEach((userPostLike) => {
       if (userPostLike.postId.equals(post._id)) {
-        post.liked = true; // Mark this post as liked by the user
+        post.liked = true;
         return;
       }
     });
   });
 };
 
-//?Purpose: Adds a preview of users who liked each post (like "John, Sarah and 5 others liked this")
-
 const enrichWithUserLikePreview = async (posts) => {
-  // Create a map of posts by their ID for quick lookup
   const postMap = posts.reduce((result, post) => {
     result[post._id] = post;
     return result;
   }, {});
   
-  // Get likes for all posts (limited to 200 for performance)
   const postLikes = await PostLike.find({
-    postId: { $in: Object.keys(postMap) }, // All post IDs
+    postId: { $in: Object.keys(postMap) },
   })
     .limit(200)
-    .populate("userId", "username"); // Get username of users who liked
+    .populate("userId", "username");
   
-  // Add user like previews to each post
   postLikes.forEach((postLike) => {
     const post = postMap[postLike.postId];
     if (!post.userLikePreview) {
       post.userLikePreview = [];
     }
-    post.userLikePreview.push(postLike.userId); // Add user info
+    post.userLikePreview.push(postLike.userId);
   });
 };
 
-//updating the post
-const updatePost=asynchandler(async(req,res)=>{
-   try {
-     const postId=req.params.id;
-     const{content,userId,isAdmin}=req.body
-     const post=await Post.findById(postId);
-     if(!post){
-         throw new apierror(400,"Post cannot be found")
-     }
-     if(post.poster!=userId && post.isAdmin!=isAdmin){
-         throw new apierror(400,"User is not authorized")
-     }
-     post.content=content;
-     post.edited=true;
-     await post.save();
-     return res.status(200).json({updatedPost:post})
-   } catch (error) {
-    throw new apierror(500,"Something went wrong while updating the Post")
-   }
-})
+// Updating the post
+const updatePost = asynchandler(async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const { content } = req.body;
+    const userId = req.user._id;
+    const isAdmin = req.user.isAdmin || false;
 
-//deleting the post
-const deletePost=asynchandler(async(req,res)=>{
-    try {
-        const postId=req.params.id
-        const {userId,isAdmin}=req.body
-        const post=await Post.findById(postId)
-        if(!post){
-            throw new apierror(400,"Post not found")
-        }
-        if(post.poster!=userId && !isAdmin){
-            throw new apierror(400,"Not authorized to delete post")
-        }
-        await post.remove()
-        await Comment.deleteMany({ post: post._id });
-        return res.status(200).json({Post:post})
-    } catch (error) {
-        throw new apierror(500,"Something went wrong while deleting the post")
+    const post = await Post.findById(postId);
+    if (!post) {
+      throw new apierror(404, "Post not found");
     }
-})
 
-//to check the post is liked or not 
-const likePost=asynchandler(async(req,res)=>{
-    try {
-        const postId=req.params.id
-        const {userId}=req.body
+    // Fix: Proper authorization check with strict equality
+    if (post.poster.toString() !== userId.toString() && !isAdmin) {
+      throw new apierror(403, "Not authorized to update this post");
+    }
 
-        const post=await Post.findById(postId);
-            if (!post) {
-      throw new apierror(404,"Post does not exist");
+    post.content = filter.clean(content);
+    post.edited = true;
+    await post.save();
+
+    return res.status(200).json(new apiresponse(200, { post }, "Post updated successfully"));
+  } catch (error) {
+    if (error instanceof apierror) throw error;
+    throw new apierror(500, `Failed to update post: ${error.message}`);
+  }
+});
+
+// Deleting the post
+const deletePost = asynchandler(async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const userId = req.user._id;
+    const isAdmin = req.user.isAdmin || false;
+
+    const post = await Post.findById(postId);
+    if (!post) {
+      throw new apierror(404, "Post not found");
+    }
+
+    // Fix: Proper authorization check
+    if (post.poster.toString() !== userId.toString() && !isAdmin) {
+      throw new apierror(403, "Not authorized to delete this post");
+    }
+
+    // Fix: Use findByIdAndDelete instead of deprecated remove()
+    await Post.findByIdAndDelete(postId);
+    await Comment.deleteMany({ post: postId });
+    await PostLike.deleteMany({ postId: postId }); // Fix: Also delete related likes
+
+    return res.status(200).json(new apiresponse(200, { message: "Post deleted successfully" }));
+  } catch (error) {
+    if (error instanceof apierror) throw error;
+    throw new apierror(500, `Failed to delete post: ${error.message}`);
+  }
+});
+
+// Like a post
+const likePost = asynchandler(async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const userId = req.user._id;
+
+    const post = await Post.findById(postId);
+    if (!post) {
+      throw new apierror(404, "Post not found");
     }
 
     const existingPostLike = await PostLike.findOne({ postId, userId });
 
     if (existingPostLike) {
-      throw new apierror(404,"Post is already liked");
+      throw new apierror(409, "Post is already liked"); // Fix: 409 for conflict
     }
 
-    await PostLike.create({
+    const newLike = await PostLike.create({
       postId,
       userId,
     });
 
-    post.likeCount = (await PostLike.find({ postId })).length;
-
+    // Update like count
+    post.likeCount = await PostLike.countDocuments({ postId }); // Fix: Use countDocuments
     await post.save();
-    return res.status(200).json( new apiresponse(200,existingPostLike))
-    } catch (error) {
-        throw new apierror(500,"Something went wrong while fetching the likedPost")
-    }
-})
 
-//to check the posts are unliked or not
+    return res.status(201).json(new apiresponse(201, { like: newLike }, "Post liked successfully"));
+  } catch (error) {
+    if (error instanceof apierror) throw error;
+    throw new apierror(500, `Failed to like post: ${error.message}`);
+  }
+});
 
+// Unlike a post
 const unlikePost = asynchandler(async (req, res) => {
   try {
     const postId = req.params.id;
-    const { userId } = req.body;
+    const userId = req.user._id;
 
     const post = await Post.findById(postId);
-
     if (!post) {
-      throw new Error("Post does not exist");
+      throw new apierror(404, "Post not found"); // Fix: Use apierror consistently
     }
 
     const existingPostLike = await PostLike.findOne({ postId, userId });
 
     if (!existingPostLike) {
-      throw new Error("Post is already not liked");
+      throw new apierror(409, "Post is not liked"); // Fix: 409 for conflict
     }
 
-    await existingPostLike.remove();
+    // Fix: Use findByIdAndDelete instead of remove()
+    await PostLike.findByIdAndDelete(existingPostLike._id);
 
-    post.likeCount = (await PostLike.find({ postId })).length;
-
+    // Update like count
+    post.likeCount = await PostLike.countDocuments({ postId });
     await post.save();
 
-    return res.status(200).json(new apiresponse(200,{ success: true }));
-  } catch (err) {
-    throw new apierror(500,"Something went wrong while fetching unlikePost")
+    return res.status(200).json(new apiresponse(200, { message: "Post unliked successfully" }));
+  } catch (error) {
+    if (error instanceof apierror) throw error;
+    throw new apierror(500, `Failed to unlike post: ${error.message}`);
   }
 });
-
 
 const getUserLikes = asynchandler(async (req, res) => {
   try {
@@ -329,7 +349,6 @@ const getUserLikes = asynchandler(async (req, res) => {
     }
 
     const postLikes = await postLikesQuery.exec();
-
     const hasMorePages = postLikes.length > USER_LIKES_PAGE_SIZE;
 
     if (hasMorePages) postLikes.pop();
@@ -341,18 +360,18 @@ const getUserLikes = asynchandler(async (req, res) => {
       };
     });
 
-    return res
-      .status(200)
-      .json(new apiresponse(200,{ userLikes: userLikes, hasMorePages, success: true }));
-  } catch (err) {
-    throw new apierror(500,"Something went wrong while fetching the userLikes")
+    return res.status(200).json(
+      new apiresponse(200, { userLikes, hasMorePages }, "User likes retrieved successfully")
+    );
+  } catch (error) {
+    throw new apierror(500, `Failed to fetch user likes: ${error.message}`);
   }
 });
 
 const getUserLikedPosts = asynchandler(async (req, res) => {
   try {
     const likerId = req.params.id;
-    const { userId } = req.body;
+    const userId = req.user?._id;
     let { page, sortBy } = req.query;
 
     if (!sortBy) sortBy = "-createdAt";
@@ -360,41 +379,44 @@ const getUserLikedPosts = asynchandler(async (req, res) => {
 
     let posts = await PostLike.find({ userId: likerId })
       .sort(sortBy)
-      .populate({ path: "postId", populate: { path: "poster" } })
+      .populate({ path: "postId", populate: { path: "poster", select: "-password" } })
       .lean();
 
+    // Fix: Get count before pagination
+    const totalCount = posts.length;
     posts = paginate(posts, 10, page);
-
-    const count = posts.length;
 
     let responsePosts = [];
     posts.forEach((post) => {
-      responsePosts.push(post.postId);
+      if (post.postId) { // Fix: Check if postId exists (in case post was deleted)
+        responsePosts.push(post.postId);
+      }
     });
 
     if (userId) {
-      await setLiked(responsePosts, userId);
+      await setLiked(responsePosts, userId.toString());
     }
 
     await enrichWithUserLikePreview(responsePosts);
 
-    return res.status(200).json(new apiresponse(200,{ data: responsePosts, count }));
-  } catch (err) {
-    console.log(err);
-    throw new apierror(500,"Something went wrong with getUserLikedPosts")
+    return res.status(200).json(
+      new apiresponse(200, { data: responsePosts, count: totalCount }, "User liked posts retrieved successfully")
+    );
+  } catch (error) {
+    console.error('Error fetching user liked posts:', error);
+    throw new apierror(500, `Failed to fetch user liked posts: ${error.message}`);
   }
 });
 
-
-export{
-    getPost,
-    getPosts,
-    createPost,
-    createPostwithImg,
-    updatePost,
-    deletePost,
-    likePost,
-    unlikePost,
-    getUserLikes,
-    getUserLikedPosts
-}
+export {
+  getPost,
+  getPosts,
+  createPost,
+  createPostwithImg,
+  updatePost,
+  deletePost,
+  likePost,
+  unlikePost,
+  getUserLikes,
+  getUserLikedPosts
+};
