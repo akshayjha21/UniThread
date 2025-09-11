@@ -1,7 +1,5 @@
 import Post from "../models/Post.models";
 import Comment from "../models/Comment.models";
-import { paginate } from "../utils/Paginate";
-import mongoose from "mongoose";
 
 import { asynchandler } from "../utils/asynchandler.js";
 import { apierror } from "../utils/apierror.js";
@@ -13,7 +11,8 @@ const cooldown=new Set();
 const createComment=asynchandler(async(req,res)=>{
     try {
         const postid=req.params.id
-        const {content,parentId,userId}=req.body
+        const {content,parentId}=req.body
+        const userId = req.user._id; // From auth middleware
     
         const post=await Post.findById(postid)
     
@@ -124,7 +123,7 @@ const deleteComment=asynchandler(async(req,res)=>{
         if(comment.commenter!=userId && !isAdmin){
             throw new apierror(400,"Not authorized to delete comment")
         }
-        await comment.remove();
+        await Comment.findByIdAndDelete(commentId);
 
         const post = await Post.findById(comment.post);
 
