@@ -1,24 +1,38 @@
 import express from "express"
-import { verifyToken } from "../middlewares/auth"
-import userControllers from "../controllers/User.controller"
+import { verifyToken } from "../middlewares/auth.js"
+import {
+     registerUser, 
+    logingUser,
+    loggedOut,
+    refreshAccessToken,
+    changeCurrentPassword,
+    followUser,
+    unfollowUser,
+    getFollowers,
+    getFollowing,
+    getUser,
+    getRandomUsers,
+    updateUserAvatar,
+    updateUser
+} from "../controllers/User.controller.js"
 
 const router=express.Router();
 
-router.post("/register", userControllers.registerUser);
-router.post("/login", userControllers.loginingUser);
-router.post("/logout", userControllers.loggedOut);
-router.get("/random", userControllers.getRandomUsers);
+router.post("/register",registerUser);
+router.post("/login",logingUser);
+router.post("/logout",loggedOut);
+router.get("/random",getRandomUsers);
 
-router.get("/:username", userControllers.getUser);
-router.patch("/:id", verifyToken, userControllers.updateUser);
+router.get("/:username",getUser);
+router.patch("/:id", verifyToken,updateUser);
 
-router.patch("/:id/password", verifyToken, userControllers.changeCurrentPassword);
-router.patch("/:id/avatar", verifyToken, userControllers.updateUserAvatar);
+router.patch("/:id/password", verifyToken,changeCurrentPassword);
+router.patch("/:id/avatar", verifyToken,updateUserAvatar);
 
-router.post("/follow/:id", verifyToken, userControllers.followUser);
-router.delete("/unfollow/:id", verifyToken, userControllers.unfollowUser);
+router.post("/follow/:id", verifyToken,followUser);
+router.delete("/unfollow/:id", verifyToken,unfollowUser);
 
-router.get("/followers/:id", userControllers.getFollowers);
-router.get("/following/:id", userControllers.getFollowing);
+router.get("/followers/:id",getFollowers);
+router.get("/following/:id",getFollowing);
 
 export default router

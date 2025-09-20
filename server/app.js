@@ -5,10 +5,10 @@ dotenv.config({
 })
 
 //importing routes
-import {Posts} from './routes/Posts.routes'
-import {Comments} from './routes/Comments.routes'
-import {Users} from './routes/Users.routes'
-import {Messages} from './routes/Messages.routes'
+import Posts from './routes/Posts.routes.js'
+import Comment from './routes/Comments.routes.js'
+
+import Users from './routes/Users.routes.js'
 
 import express from 'express'
 import cors from 'cors'
@@ -29,7 +29,6 @@ app.use(cookieParser())
 //main routes
 app.use("api/users",Users)
 app.use("api/posts",Posts)
-app.use("api/comments",Comments)
-app.use("api/messages",Messages)
+app.use("api/comments",Comment)
 
 export {app};
